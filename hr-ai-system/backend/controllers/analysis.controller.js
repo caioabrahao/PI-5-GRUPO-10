@@ -9,7 +9,8 @@
  */
 
 const { RoleRepo, ResumeRepo, AnalysisRepo, ComparisonRepo } = require('../database/db');
-const { analyzeResume, compareResumes } = require('../services/openai.service');
+const { compareResumes } = require('../services/openai.service');
+const { runResumeAnalysis } = require('../services/analysis-runner.service');
 const logger = require('../utils/logger');
 
 /**
@@ -26,38 +27,9 @@ async function analyzeOne(req, res, next) {
       return res.status(404).json({ ok: false, error: 'Currículo não encontrado.' });
     }
 
-    if (!resume.role_id) {
-      return res.status(400).json({ ok: false, error: 'Este currículo ainda não está vinculado a uma vaga.' });
-    }
+    logger.info('Iniciando análise IA', { resumeId, roleId: resume.role_id, hasJob: !!jobDescription });
 
-    const role = RoleRepo.findById(resume.role_id);
-    if (!role) {
-      return res.status(404).json({ ok: false, error: 'A vaga associada ao currículo não foi encontrada.' });
-    }
-
-    const effectiveRoleDescription = (jobDescription && jobDescription.trim()) || role.description;
-
-    logger.info('Iniciando análise IA', { resumeId, roleId: role.id, hasJob: !!jobDescription });
-
-    const analysis = await analyzeResume(resume.extracted_text, {
-      title: role.title,
-      description: effectiveRoleDescription,
-    });
-
-    // Validação básica de campos críticos
-    if (typeof analysis.score !== 'number' || !analysis.nivel) {
-      throw new Error('Resposta da IA incompleta. Tente novamente.');
-    }
-
-    const saved = AnalysisRepo.create({
-      resumeId,
-      roleId: role.id,
-      jobDescription: effectiveRoleDescription,
-      score: analysis.score,
-      level: analysis.nivel,
-      risk: analysis.risco_contratacao,
-      fullAnalysis: analysis,
-    });
+    const { saved, analysis, role } = await runResumeAnalysis(resumeId, { jobDescription });
 
     res.json({
       ok: true,

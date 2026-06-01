@@ -5,13 +5,13 @@
 
 const fs = require('fs').promises;
 const path = require('path');
-const { RoleRepo, ResumeRepo } = require('../database/db');
-const { extractTextFromPDF, inferCandidateName } = require('../services/pdf.service');
+const { RoleRepo, ResumeRepo, AnalysisRepo, UploadJobRepo } = require('../database/db');
+const { createUploadJob } = require('../services/upload-job.service');
 const logger = require('../utils/logger');
 
 /**
  * POST /api/resumes
- * Upload de um currículo PDF.
+ * Upload em lote de currículos PDF com processamento assíncrono.
  */
 async function uploadResume(req, res, next) {
   try {
@@ -30,81 +30,24 @@ async function uploadResume(req, res, next) {
       return res.status(404).json({ ok: false, error: 'A vaga selecionada não existe mais.' });
     }
 
-    const results = [];
+    const job = createUploadJob(roleId, files);
 
-    for (const file of files) {
-      const { filename, originalname, path: filePath, size } = file;
-
-      logger.info('Processando PDF', { filename, size, roleId });
-
-      try {
-        const extracted = await extractTextFromPDF(filePath);
-        const candidateName = inferCandidateName(extracted.text);
-
-        const resume = ResumeRepo.create({
-          roleId,
-          filename,
-          originalName: originalname,
-          candidateName,
-          extractedText: extracted.text,
-          fileSize: size,
-        });
-
-        logger.success('Currículo cadastrado', {
-          id: resume.id,
-          candidate: candidateName,
-          role: role.title,
-          pages: extracted.pages,
-        });
-
-        results.push({
-          ok: true,
-          id: resume.id,
-          filename: resume.filename,
-          original_name: resume.original_name,
-          candidate_name: resume.candidate_name,
-          role_id: resume.role_id,
-          role_title: resume.role_title,
-          file_size: resume.file_size,
-          created_at: resume.created_at,
-          pages: extracted.pages,
-          text_preview: extracted.text.slice(0, 300),
-        });
-      } catch (extractErr) {
-        await fs.unlink(filePath).catch(() => {});
-        results.push({
-          ok: false,
-          filename: originalname,
-          error: extractErr.message || 'Não foi possível extrair texto do PDF.',
-        });
-      }
-    }
-
-    const successCount = results.filter((item) => item.ok).length;
-    const errorCount = results.length - successCount;
-
-    const responsePayload = {
-      role: {
-        id: role.id,
-        title: role.title,
-        description: role.description,
-      },
-      successCount,
-      errorCount,
-      items: results,
-    };
-
-    if (!successCount) {
-      return res.status(422).json({
-        ok: false,
-        error: 'Nenhum PDF pôde ser processado.',
-        data: responsePayload,
-      });
-    }
+    logger.info('Lote de upload enfileirado', {
+      jobId: job.id,
+      roleId,
+      totalFiles: files.length,
+    });
 
     res.status(201).json({
       ok: true,
-      data: responsePayload,
+      data: {
+        role: {
+          id: role.id,
+          title: role.title,
+          description: role.description,
+        },
+        job,
+      },
     });
   } catch (err) {
     next(err);
@@ -143,6 +86,68 @@ async function getResume(req, res, next) {
 }
 
 /**
+ * GET /api/resumes/:id/overview
+ * Retorna o currículo com histórico e última análise.
+ */
+async function getResumeOverview(req, res, next) {
+  try {
+    const id = parseInt(req.params.id, 10);
+    const resume = ResumeRepo.findById(id);
+    if (!resume) {
+      return res.status(404).json({ ok: false, error: 'Currículo não encontrado.' });
+    }
+
+    const latestAnalysis = AnalysisRepo.findLatestByResumeId(id);
+    const analysisHistory = AnalysisRepo.findByResumeId(id);
+    res.json({
+      ok: true,
+      data: {
+        resume,
+        latestAnalysis,
+        analysisHistory,
+      },
+    });
+  } catch (err) {
+    next(err);
+  }
+}
+
+/**
+ * GET /api/resumes/jobs/latest?roleId=123
+ * Retorna o lote mais recente da vaga.
+ */
+async function getLatestUploadJob(req, res, next) {
+  try {
+    const roleId = parseInt(req.query.roleId, 10);
+    if (!Number.isInteger(roleId)) {
+      return res.status(400).json({ ok: false, error: 'Informe roleId.' });
+    }
+
+    const job = UploadJobRepo.findLatestByRoleId(roleId);
+    res.json({ ok: true, data: job });
+  } catch (err) {
+    next(err);
+  }
+}
+
+/**
+ * GET /api/resumes/jobs/:jobId
+ * Retorna detalhes do processamento assíncrono.
+ */
+async function getUploadJob(req, res, next) {
+  try {
+    const jobId = parseInt(req.params.jobId, 10);
+    const job = UploadJobRepo.findById(jobId);
+    if (!job) {
+      return res.status(404).json({ ok: false, error: 'Lote de upload não encontrado.' });
+    }
+    res.json({ ok: true, data: job });
+  } catch (err) {
+    next(err);
+  }
+}
+
+/**
  * DELETE /api/resumes/:id
  * Remove currículo (banco + arquivo físico).
  */
@@ -165,4 +170,12 @@ async function deleteResume(req, res, next) {
   }
 }
 
-module.exports = { uploadResume, listResumes, getResume, deleteResume };
+module.exports = {
+  uploadResume,
+  listResumes,
+  getResume,
+  getResumeOverview,
+  getLatestUploadJob,
+  getUploadJob,
+  deleteResume,
+};

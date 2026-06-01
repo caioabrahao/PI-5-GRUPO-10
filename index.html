@@ -32,9 +32,16 @@
     <div class="sidebar-section">
       <div class="sidebar-label">Vaga atual</div>
       <div class="role-select-wrap">
-        <select id="rolePicker" class="input sidebar-select" aria-label="Vaga selecionada">
-          <option value="">— selecione uma vaga —</option>
-        </select>
+        <div class="role-switcher" id="rolePicker">
+          <button class="role-switcher-trigger" id="rolePickerTrigger" type="button" aria-haspopup="listbox" aria-expanded="false">
+            <span class="role-switcher-copy">
+              <strong id="rolePickerTitle">Selecione uma vaga</strong>
+              <span id="rolePickerMeta">Escolha uma vaga para trocar o contexto</span>
+            </span>
+            <span class="role-switcher-chevron">▾</span>
+          </button>
+          <div class="role-switcher-menu hidden" id="rolePickerMenu" role="listbox" aria-label="Lista de vagas"></div>
+        </div>
         <button class="sidebar-action" id="openCreateRoleBtn">+ Nova vaga</button>
       </div>
       <button class="sidebar-link" id="openRolesBtn">Ver todas as vagas</button>
@@ -83,6 +90,16 @@
         <span class="kpi"><strong id="kpiTotal">0</strong> currículos</span>
         <span class="kpi"><strong id="kpiAnalyses">0</strong> análises</span>
         <span class="kpi progress-kpi" id="analysisProgressKpi">Pronto</span>
+        <div class="header-progress" id="headerProgressShell">
+          <div class="header-progress-copy">
+            <span class="header-progress-title">Processamento</span>
+            <span class="header-progress-meta" id="headerProgressMeta">Nenhum processamento em andamento</span>
+          </div>
+          <div class="header-progress-track">
+            <div class="header-progress-fill" id="headerProgressFill"></div>
+          </div>
+          <strong class="header-progress-value" id="headerProgressValue">0%</strong>
+        </div>
       </div>
     </header>
 
@@ -122,9 +139,21 @@
         <div class="card-header">
           <h3 class="card-title">Currículos da vaga</h3>
           <div class="header-actions">
+            <div class="batch-actions hidden" id="resumeBatchActions">
+              <span class="batch-actions-label" id="resumeBatchLabel">0 selecionados</span>
+              <button class="btn-ghost" id="analyzeSelectedBtn">Gerar análise</button>
+              <button class="btn-ghost" id="clearSelectionBtn">Limpar</button>
+              <button class="btn-ghost danger-ghost" id="deleteSelectedBtn">Excluir</button>
+            </div>
             <button class="btn-ghost" id="refreshResumesBtn">↻ Atualizar</button>
             <button class="btn-primary" id="openUploadBtn">Upload de PDFs</button>
           </div>
+        </div>
+        <div class="resume-toolbar hidden" id="resumeToolbar">
+          <label class="selection-toggle">
+            <input type="checkbox" id="selectAllResumes" />
+            <span>Selecionar todos os candidatos da vaga</span>
+          </label>
         </div>
         <div class="resume-list" id="resumeList">
           <div class="empty">Nenhum currículo enviado ainda.</div>
@@ -148,6 +177,24 @@
           </div>
         </div>
         <div id="uploadStatus" class="upload-status hidden"></div>
+      </div>
+    </section>
+
+    <section class="view" id="view-roles">
+      <div class="card">
+        <div class="card-header">
+          <h3 class="card-title">Todas as vagas</h3>
+          <button class="btn-primary" id="rolesCreateBtn">Criar nova vaga</button>
+        </div>
+        <div class="roles-grid" id="rolesList">
+          <div class="empty">Nenhuma vaga cadastrada ainda.</div>
+        </div>
+      </div>
+    </section>
+
+    <section class="view" id="view-candidate">
+      <div class="candidate-shell" id="candidateOverview">
+        <div class="empty">Selecione um candidato para ver os detalhes.</div>
       </div>
     </section>
 

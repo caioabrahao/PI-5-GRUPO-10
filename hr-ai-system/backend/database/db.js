@@ -75,10 +75,47 @@ db.exec(`
     FOREIGN KEY (resume_id_b) REFERENCES resumes(id) ON DELETE CASCADE
   );
 
+  CREATE TABLE IF NOT EXISTS upload_jobs (
+    id INTEGER PRIMARY KEY AUTOINCREMENT,
+    role_id INTEGER NOT NULL,
+    status TEXT NOT NULL DEFAULT 'queued',
+    total_files INTEGER NOT NULL DEFAULT 0,
+    uploaded_count INTEGER NOT NULL DEFAULT 0,
+    analyzed_count INTEGER NOT NULL DEFAULT 0,
+    failed_count INTEGER NOT NULL DEFAULT 0,
+    current_step TEXT,
+    current_file TEXT,
+    message TEXT,
+    created_at DATETIME DEFAULT CURRENT_TIMESTAMP,
+    updated_at DATETIME DEFAULT CURRENT_TIMESTAMP,
+    completed_at DATETIME,
+    FOREIGN KEY (role_id) REFERENCES roles(id) ON DELETE CASCADE
+  );
+
+  CREATE TABLE IF NOT EXISTS upload_job_items (
+    id INTEGER PRIMARY KEY AUTOINCREMENT,
+    job_id INTEGER NOT NULL,
+    filename TEXT NOT NULL,
+    original_name TEXT NOT NULL,
+    status TEXT NOT NULL DEFAULT 'queued',
+    step TEXT NOT NULL DEFAULT 'queued',
+    error TEXT,
+    resume_id INTEGER,
+    analysis_id INTEGER,
+    candidate_name TEXT,
+    created_at DATETIME DEFAULT CURRENT_TIMESTAMP,
+    updated_at DATETIME DEFAULT CURRENT_TIMESTAMP,
+    FOREIGN KEY (job_id) REFERENCES upload_jobs(id) ON DELETE CASCADE,
+    FOREIGN KEY (resume_id) REFERENCES resumes(id) ON DELETE SET NULL,
+    FOREIGN KEY (analysis_id) REFERENCES analyses(id) ON DELETE SET NULL
+  );
+
   CREATE INDEX IF NOT EXISTS idx_roles_created ON roles(created_at DESC);
   CREATE INDEX IF NOT EXISTS idx_analyses_resume ON analyses(resume_id);
   CREATE INDEX IF NOT EXISTS idx_analyses_score ON analyses(score DESC);
   CREATE INDEX IF NOT EXISTS idx_resumes_created ON resumes(created_at DESC);
+  CREATE INDEX IF NOT EXISTS idx_upload_jobs_role ON upload_jobs(role_id, created_at DESC);
+  CREATE INDEX IF NOT EXISTS idx_upload_job_items_job ON upload_job_items(job_id, id ASC);
 `);
 
 function ensureColumn(tableName, columnName, definition) {
@@ -91,6 +128,7 @@ function ensureColumn(tableName, columnName, definition) {
 ensureColumn('resumes', 'role_id', 'role_id INTEGER');
 ensureColumn('analyses', 'role_id', 'role_id INTEGER');
 ensureColumn('comparisons', 'role_id', 'role_id INTEGER');
+ensureColumn('upload_jobs', 'role_id', 'role_id INTEGER NOT NULL DEFAULT 0');
 
 db.exec(`
   CREATE INDEX IF NOT EXISTS idx_resumes_role ON resumes(role_id);
@@ -219,6 +257,19 @@ const AnalysisRepo = {
     return rows.map((r) => ({ ...r, full_analysis: JSON.parse(r.full_analysis) }));
   },
 
+  findLatestByResumeId(resumeId) {
+    const row = db.prepare(
+      `SELECT a.*, role.title AS role_title, role.description AS role_description
+       FROM analyses a
+       LEFT JOIN roles role ON role.id = a.role_id
+       WHERE a.resume_id = ?
+       ORDER BY a.created_at DESC
+       LIMIT 1`
+    ).get(resumeId);
+    if (row) row.full_analysis = JSON.parse(row.full_analysis);
+    return row || null;
+  },
+
   findRanking(limit = 10, roleId) {
     const hasRoleFilter = Number.isInteger(roleId);
     const query = db.prepare(`
@@ -253,6 +304,116 @@ const AnalysisRepo = {
 
 };
 
+function normalizeUploadJob(job) {
+  if (!job) return null;
+  const totalUnits = Math.max(Number(job.total_files || 0) * 2, 1);
+  const completedUnits = Math.min(
+    totalUnits,
+    Number(job.uploaded_count || 0) + Number(job.analyzed_count || 0) + Number(job.failed_count || 0)
+  );
+
+  return {
+    ...job,
+    total_files: Number(job.total_files || 0),
+    uploaded_count: Number(job.uploaded_count || 0),
+    analyzed_count: Number(job.analyzed_count || 0),
+    failed_count: Number(job.failed_count || 0),
+    progress_percent: Math.round((completedUnits / totalUnits) * 100),
+  };
+}
+
+const UploadJobRepo = {
+  create({ roleId, files }) {
+    const insertJob = db.prepare(`
+      INSERT INTO upload_jobs (role_id, total_files, current_step, message)
+      VALUES (?, ?, 'queued', 'Arquivos recebidos')
+    `);
+    const insertItem = db.prepare(`
+      INSERT INTO upload_job_items (job_id, filename, original_name)
+      VALUES (?, ?, ?)
+    `);
+
+    const tx = db.transaction((payload) => {
+      const jobResult = insertJob.run(payload.roleId, payload.files.length);
+      for (const file of payload.files) {
+        insertItem.run(jobResult.lastInsertRowid, file.filename, file.originalname);
+      }
+      return jobResult.lastInsertRowid;
+    });
+
+    return this.findById(tx({ roleId, files }));
+  },
+
+  findById(id) {
+    const job = db.prepare(`
+      SELECT j.*, role.title AS role_title
+      FROM upload_jobs j
+      LEFT JOIN roles role ON role.id = j.role_id
+      WHERE j.id = ?
+    `).get(id);
+
+    if (!job) return null;
+
+    const items = db.prepare(`
+      SELECT id, job_id, filename, original_name, status, step, error, resume_id, analysis_id, candidate_name, created_at, updated_at
+      FROM upload_job_items
+      WHERE job_id = ?
+      ORDER BY id ASC
+    `).all(id);
+
+    return {
+      ...normalizeUploadJob(job),
+      items,
+    };
+  },
+
+  findLatestByRoleId(roleId) {
+    const row = db.prepare(`
+      SELECT id
+      FROM upload_jobs
+      WHERE role_id = ?
+      ORDER BY created_at DESC, id DESC
+      LIMIT 1
+    `).get(roleId);
+    return row ? this.findById(row.id) : null;
+  },
+
+  updateJob(id, patch) {
+    const keys = Object.keys(patch || {});
+    if (!keys.length) return this.findById(id);
+
+    const assignments = keys.map((key) => `${key} = @${key}`).join(', ');
+    db.prepare(`
+      UPDATE upload_jobs
+      SET ${assignments}, updated_at = CURRENT_TIMESTAMP
+      WHERE id = @id
+    `).run({ id, ...patch });
+
+    return this.findById(id);
+  },
+
+  updateItem(id, patch) {
+    const keys = Object.keys(patch || {});
+    if (!keys.length) return;
+
+    const assignments = keys.map((key) => `${key} = @${key}`).join(', ');
+    db.prepare(`
+      UPDATE upload_job_items
+      SET ${assignments}, updated_at = CURRENT_TIMESTAMP
+      WHERE id = @id
+    `).run({ id, ...patch });
+  },
+
+  getItems(jobId) {
+    return db.prepare(`
+      SELECT id, job_id, filename, original_name, status, step, error, resume_id, analysis_id, candidate_name, created_at, updated_at
+      FROM upload_job_items
+      WHERE job_id = ?
+      ORDER BY id ASC
+    `).all(jobId);
+  },
+};
+
 const ComparisonRepo = {
   create({ resumeIdA, resumeIdB, roleId, jobDescription, fullComparison, winner }) {
     const stmt = db.prepare(`
@@ -277,4 +438,4 @@ const ComparisonRepo = {
   },
 };
 
-module.exports = { db, RoleRepo, ResumeRepo, AnalysisRepo, ComparisonRepo };
+module.exports = { db, RoleRepo, ResumeRepo, AnalysisRepo, ComparisonRepo, UploadJobRepo };
