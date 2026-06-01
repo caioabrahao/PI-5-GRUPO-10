@@ -1,69 +1,86 @@
 # HR AI System
 
-Plataforma web para análise de currículos com IA. A estrutura ativa do repositório foi enxugada para refletir o que realmente roda hoje: frontend estático na raiz do workspace e backend Express dentro de `hr-ai-system/backend`.
+Aplicação web para triagem de currículos com IA. O frontend ativo fica na raiz do workspace e o backend Express fica em `hr-ai-system/backend`.
 
-## Funcionalidades
+## O que o sistema faz
 
-- Cadastro de vagas com descrição e requisitos.
-- Upload de currículos em PDF vinculado à vaga ativa.
-- Análise de candidatos com IA usando score, riscos, pontos fortes e fracos.
-- Comparação entre candidatos da mesma vaga.
-- Dashboard com visão geral, melhores candidatos e histórico.
+- Cadastra vagas com descrição e contexto da posição.
+- Faz upload de múltiplos PDFs por vaga.
+- Processa extração de texto e análise de IA em background.
+- Mostra progresso do lote no header, sem travar a interface.
+- Exibe overview da vaga com melhores candidatos e lista de currículos.
+- Permite selecionar múltiplos candidatos para excluir ou gerar análise.
+- Abre uma página de candidato com análise detalhada, histórico e nova análise manual.
+- Lista todas as vagas em uma página dedicada.
 
-## Estrutura atual
+## Estrutura ativa
 
 ```text
 files(1)/
-├── index.html                     # Frontend servido pelo backend
-├── script.js                      # Lógica do frontend ativo
-├── style.css                      # Estilos do frontend ativo
-├── server.js                      # Wrapper para o backend principal
-├── package.json                   # Scripts para subir o app pela raiz
+├── index.html
+├── script.js
+├── style.css
+├── server.js
+├── package.json
 ├── .env.example
-├── hr-ai-system/
-│   ├── package.json               # Pacote do backend
-│   ├── README.md
-│   └── backend/
-│       ├── server.js              # Servidor Express principal
-│       ├── controllers/
-│       ├── routes/
-│       ├── services/
-│       ├── middlewares/
-│       ├── database/
-│       ├── uploads/
-│       └── utils/
-└── README.md
+└── hr-ai-system/
+	├── package.json
+	├── README.md
+	└── backend/
+		├── server.js
+		├── controllers/
+		├── routes/
+		├── services/
+		├── middlewares/
+		├── database/
+		├── uploads/
+		└── utils/
 ```
 
-## Como rodar pela raiz
-
-### 1. Pré-requisitos
+## Requisitos
 
 - Node.js 20+
-- Uma API key da OpenAI
+- OpenAI API key
 
-### 2. Instalação
+## Como rodar
 
 ```bash
 npm install
 copy .env.example .env
 ```
 
-Depois edite `.env` e configure `OPENAI_API_KEY`.
-
-### 3. Executar
+Preencha `OPENAI_API_KEY` no `.env` e depois execute:
 
 ```bash
 npm start
 ```
 
-O script da raiz sobe `hr-ai-system/backend/server.js`, que serve os arquivos `index.html`, `script.js` e `style.css` na própria raiz do workspace.
+O backend sobe em `http://localhost:3000` e serve o frontend da raiz do projeto.
 
-## Observações de organização
+## Fluxo de uso
 
-- A raiz contém apenas o frontend ativo e o atalho de execução.
-- O diretório `hr-ai-system/` concentra o backend e a lógica de domínio.
-- Arquivos legados e cópias duplicadas de frontend foram removidos para evitar ambiguidade sobre qual estrutura está em uso.
+1. Crie uma vaga.
+2. Selecione a vaga no sidebar.
+3. Envie um ou mais PDFs.
+4. Acompanhe o progresso do processamento no header.
+5. Abra candidatos pela overview para ver a análise detalhada.
+6. Use a seleção múltipla para analisar ou excluir em lote.
+
+## Configuração principal
+
+As variáveis mais importantes do `.env` são:
+
+- `OPENAI_API_KEY`
+- `OPENAI_MODEL`
+- `PORT`
+- `MAX_FILE_SIZE_MB`
+- `DB_PATH`
+
+## Observações
+
+- O banco usado hoje é SQLite via `better-sqlite3`.
+- Os uploads são persistidos em `hr-ai-system/backend/uploads`.
+- O processamento assíncrono continua no mesmo processo Node; se o servidor parar, lotes em andamento não retomam automaticamente.
 
 ## Licença
 

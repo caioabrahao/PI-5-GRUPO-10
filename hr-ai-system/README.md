@@ -1,6 +1,15 @@
 # HR AI System Backend
 
-Este diretório concentra o backend principal do projeto. O frontend ativo fica na raiz do workspace e é servido por [backend/server.js](backend/server.js).
+Este diretório concentra o backend Express da aplicação. O frontend ativo continua na raiz do workspace e é servido por `backend/server.js`.
+
+## Responsabilidades
+
+- API de vagas, currículos e análises.
+- Upload e armazenamento de PDFs.
+- Extração de texto dos currículos.
+- Processamento assíncrono dos lotes de upload.
+- Integração com OpenAI.
+- Persistência local em SQLite.
 
 ## Estrutura
 
@@ -9,27 +18,27 @@ hr-ai-system/
 ├── package.json
 ├── README.md
 └── backend/
-	├── server.js
-	├── controllers/
-	├── routes/
-	├── services/
-	├── middlewares/
-	├── database/
-	├── uploads/
-	└── utils/
+    ├── server.js
+    ├── controllers/
+    ├── routes/
+    ├── services/
+    ├── middlewares/
+    ├── database/
+    ├── uploads/
+    └── utils/
 ```
 
-## Execução
-
-Dentro deste diretório:
+## Rodando por este diretório
 
 ```bash
 npm install
 npm start
 ```
 
-O servidor sobe normalmente, mas os arquivos estáticos do frontend continuam sendo carregados a partir da raiz do workspace.
+O backend inicia normalmente, mas continua servindo os arquivos estáticos da raiz do workspace.
 
-## Observação
+## Observações
 
-O antigo diretório `frontend/` dentro de `hr-ai-system/` foi removido porque não era mais usado pela aplicação em execução.
+- O banco atual é SQLite.
+- Os jobs de upload e análise são processados no mesmo processo Node.
+- O diretório `frontend/` antigo não faz mais parte da aplicação em uso.
