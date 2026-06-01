@@ -1,0 +1,191 @@
+<!DOCTYPE html>
+<html lang="pt-BR">
+<head>
+  <meta charset="UTF-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+  <title>HR AI System · Análise inteligente de currículos</title>
+  <link rel="stylesheet" href="/style.css" />
+  <link rel="preconnect" href="https://fonts.googleapis.com" />
+  <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin />
+  <link
+    href="https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700;800&family=JetBrains+Mono:wght@400;600&display=swap"
+    rel="stylesheet"
+  />
+</head>
+<body>
+  <!-- ============== SIDEBAR ============== -->
+  <aside class="sidebar">
+    <div class="brand">
+      <div class="brand-logo">
+        <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
+          <path d="M12 2L2 7l10 5 10-5-10-5z" />
+          <path d="M2 17l10 5 10-5" />
+          <path d="M2 12l10 5 10-5" />
+        </svg>
+      </div>
+      <div>
+        <h1>HR AI</h1>
+        <span class="brand-tag">Recrutamento inteligente</span>
+      </div>
+    </div>
+
+    <div class="sidebar-section">
+      <div class="sidebar-label">Vaga atual</div>
+      <div class="role-select-wrap">
+        <select id="rolePicker" class="input sidebar-select" aria-label="Vaga selecionada">
+          <option value="">— selecione uma vaga —</option>
+        </select>
+        <button class="sidebar-action" id="openCreateRoleBtn">+ Nova vaga</button>
+      </div>
+      <button class="sidebar-link" id="openRolesBtn">Ver todas as vagas</button>
+    </div>
+
+    <nav class="nav">
+      <button class="nav-item active" data-page="overview">
+        <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
+          <path d="M4 6h16M4 12h16M4 18h16" />
+        </svg>
+        <span>Overview</span>
+      </button>
+      <button class="nav-item" data-page="create-role">
+        <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
+          <path d="M12 5v14M5 12h14" />
+        </svg>
+        <span>Criar vaga</span>
+      </button>
+      <button class="nav-item" data-page="upload">
+        <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
+          <path d="M21 15v4a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2v-4" />
+          <polyline points="17 8 12 3 7 8" />
+          <line x1="12" y1="3" x2="12" y2="15" />
+        </svg>
+        <span>Upload</span>
+      </button>
+    </nav>
+
+    <div class="sidebar-footer">
+      <div class="status" id="apiStatus">
+        <span class="dot"></span>
+        <span class="label">Verificando API...</span>
+      </div>
+    </div>
+  </aside>
+
+  <!-- ============== MAIN ============== -->
+  <main class="main">
+    <header class="topbar">
+      <div>
+        <h2 id="viewTitle">Overview da vaga</h2>
+        <p id="viewSubtitle" class="muted">Veja a vaga, os melhores candidatos e o progresso da análise</p>
+      </div>
+      <div class="topbar-actions">
+        <span class="kpi"><strong id="kpiRoleCount">0</strong> vagas</span>
+        <span class="kpi"><strong id="kpiTotal">0</strong> currículos</span>
+        <span class="kpi"><strong id="kpiAnalyses">0</strong> análises</span>
+        <span class="kpi progress-kpi" id="analysisProgressKpi">Pronto</span>
+      </div>
+    </header>
+
+    <section class="view active" id="view-overview">
+      <div class="overview-grid">
+        <div class="card overview-card role-card">
+          <div class="card-header">
+            <h3 class="card-title">Resumo da vaga</h3>
+            <span class="role-hint" id="roleMetaHint">Nenhuma vaga selecionada</span>
+          </div>
+          <div class="role-summary" id="activeRoleSummary">
+            <div>
+              <div class="role-summary-label">Vaga ativa</div>
+              <div class="role-summary-title" id="activeRoleName">Selecione uma vaga</div>
+            </div>
+            <p class="role-summary-desc" id="activeRoleDescription">Use o dropdown da sidebar para trocar entre vagas.</p>
+          </div>
+          <div class="mini-stats" id="overviewStats">
+            <div class="mini-stat"><strong id="overviewCandidates">0</strong><span>Candidatos</span></div>
+            <div class="mini-stat"><strong id="overviewAnalyzed">0</strong><span>Analisados</span></div>
+            <div class="mini-stat"><strong id="overviewBest">—</strong><span>Melhor score</span></div>
+          </div>
+        </div>
+
+        <div class="card overview-card">
+          <div class="card-header">
+            <h3 class="card-title">Melhores candidatos</h3>
+            <button class="btn-ghost" id="refreshOverviewBtn">↻ Atualizar</button>
+          </div>
+          <div id="bestCandidatesList" class="compact-list">
+            <div class="empty">Nenhum candidato analisado ainda.</div>
+          </div>
+        </div>
+      </div>
+
+      <div class="card">
+        <div class="card-header">
+          <h3 class="card-title">Currículos da vaga</h3>
+          <div class="header-actions">
+            <button class="btn-ghost" id="refreshResumesBtn">↻ Atualizar</button>
+            <button class="btn-primary" id="openUploadBtn">Upload de PDFs</button>
+          </div>
+        </div>
+        <div class="resume-list" id="resumeList">
+          <div class="empty">Nenhum currículo enviado ainda.</div>
+        </div>
+      </div>
+    </section>
+
+    <section class="view" id="view-upload">
+      <div class="card big-card">
+        <div class="dropzone" id="dropzone">
+          <input type="file" id="fileInput" accept="application/pdf,.pdf" multiple hidden />
+          <div class="dropzone-content">
+            <svg class="dz-icon" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.6">
+              <path d="M21 15v4a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2v-4" />
+              <polyline points="17 8 12 3 7 8" />
+              <line x1="12" y1="3" x2="12" y2="15" />
+            </svg>
+            <h3>Arraste os PDFs aqui</h3>
+            <p>ou <button class="link" id="pickFileBtn">selecione arquivos</button></p>
+            <span class="hint">PDFs múltiplos · até 10MB cada</span>
+          </div>
+        </div>
+        <div id="uploadStatus" class="upload-status hidden"></div>
+      </div>
+    </section>
+
+    <section class="view" id="view-create-role">
+      <div class="card role-card">
+        <div class="card-header">
+          <h3 class="card-title">Nova vaga / cargo</h3>
+          <span class="role-hint">A descrição deve deixar claro o que é esperado do candidato</span>
+        </div>
+        <div class="form-grid-2">
+          <div class="form-row">
+            <label class="label" for="roleTitleInput">Título da vaga</label>
+            <input id="roleTitleInput" class="input" type="text" placeholder="Ex.: Desenvolvedor Backend Sênior" />
+          </div>
+          <div class="form-row">
+            <label class="label" for="roleDescriptionInput">Requisitos e expectativas</label>
+            <textarea id="roleDescriptionInput" class="input textarea" rows="7" placeholder="Descreva competências, responsabilidades, entregas e o que você espera do candidato..."></textarea>
+          </div>
+        </div>
+        <div class="form-row form-actions-row">
+          <button class="btn-primary" id="createRoleBtn">Criar vaga</button>
+        </div>
+      </div>
+    </section>
+  </main>
+
+  <!-- ============== LOADER OVERLAY ============== -->
+  <div class="loader-overlay" id="loader">
+    <div class="loader-box">
+      <div class="spinner"></div>
+      <h4 id="loaderTitle">Processando...</h4>
+      <p id="loaderText" class="muted">Isso pode levar alguns segundos</p>
+    </div>
+  </div>
+
+  <!-- ============== TOAST ============== -->
+  <div class="toast-container" id="toastContainer"></div>
+
+  <script src="/script.js"></script>
+</body>
+</html>

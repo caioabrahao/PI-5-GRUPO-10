@@ -1,0 +1,40 @@
+# ---- Variáveis de ambiente (NUNCA commitar!) ----
+.env
+.env.local
+.env.*.local
+
+# ---- Dependências ----
+node_modules/
+npm-debug.log*
+yarn-debug.log*
+yarn-error.log*
+package-lock.json
+
+# ---- Banco de dados ----
+*.db
+*.db-journal
+*.sqlite
+*.sqlite3
+backend/database/*.db
+
+# ---- Uploads de usuários ----
+backend/uploads/*
+!backend/uploads/.gitkeep
+
+# ---- Sistema ----
+.DS_Store
+Thumbs.db
+*.log
+logs/
+
+# ---- Editores ----
+.vscode/
+.idea/
+*.swp
+*.swo
+*~
+
+# ---- Build/Cache ----
+dist/
+build/
+.cache/

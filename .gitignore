@@ -1,0 +1,10 @@
+node_modules/
+hr-ai-system/node_modules/
+.env
+hr-ai-system/.env
+backend/database/*.db
+backend/database/*.db-*
+hr-ai-system/backend/database/*.db
+hr-ai-system/backend/database/*.db-*
+hr-ai-system/backend/uploads/*
+!hr-ai-system/backend/uploads/.gitkeep
