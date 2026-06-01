@@ -1060,8 +1060,18 @@ function bindUploadControls() {
 
 function bindSidebarControls() {
   $('#rolePickerTrigger').addEventListener('click', () => toggleRolePicker());
+  $('#rolePickerTrigger').addEventListener('keydown', (event) => {
+    if (event.key === 'Escape') {
+      toggleRolePicker(false);
+    }
+  });
   document.addEventListener('click', (event) => {
     if (!event.target.closest('#rolePicker')) {
+      toggleRolePicker(false);
+    }
+  });
+  document.addEventListener('keydown', (event) => {
+    if (event.key === 'Escape') {
       toggleRolePicker(false);
     }
   });
@@ -1120,6 +1130,9 @@ async function renderRoute() {
   }
 
   await loadOverviewData(true);
+  renderRolePicker();
+  renderRoleSummary();
+  toggleRolePicker(false);
 
   showPage(route.page);
 
